@@ -1,4 +1,3 @@
-﻿// src/app/api/exam/answer/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
@@ -20,10 +19,11 @@ export async function POST(req: NextRequest) {
       { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
     )
 
+    // AUTH FIRST
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body   = await req.json()
+    const body = await req.json()
     const parsed = AnswerSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: "Validasi gagal", details: parsed.error.flatten() }, { status: 400 })
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (upsertError) return NextResponse.json({ error: "Gagal menyimpan jawaban" }, { status: 500 })
 
     return NextResponse.json({ success: true, saved_at: new Date().toISOString() })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

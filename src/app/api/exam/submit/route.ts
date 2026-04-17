@@ -1,12 +1,9 @@
-﻿// src/app/api/exam/submit/route.ts
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { z } from "zod"
 
-const SubmitSchema = z.object({
-  session_id: z.string().uuid(),
-})
+const SubmitSchema = z.object({ session_id: z.string().uuid() })
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,10 +14,11 @@ export async function POST(req: NextRequest) {
       { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
     )
 
+    // AUTH FIRST
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body   = await req.json()
+    const body = await req.json()
     const parsed = SubmitSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: "session_id tidak valid" }, { status: 400 })
 
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (submitError) return NextResponse.json({ error: "Gagal submit ujian", detail: submitError.message }, { status: 500 })
 
     return NextResponse.json({ success: true, session_id, result_id: result?.result_id })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

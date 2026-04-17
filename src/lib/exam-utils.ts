@@ -115,7 +115,7 @@ export function calcProgress(answers: Record<string, UserAnswer>, totalQuestions
 
 export function getTimerColor(secondsLeft: number, totalSeconds: number): string {
   const ratio = secondsLeft / totalSeconds
-  if (ratio > 0.5) return "text-emerald-400"
+  if (ratio >= 0.5) return "text-emerald-400"
   if (ratio > 0.25) return "text-amber-400"
   return "text-red-400"
 }

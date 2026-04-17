@@ -2,25 +2,19 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useAutoSave } from '@/hooks/useAutoSave'
 
 const PAYLOAD = {
-  session_id: 'sess-uuid',
-  question_id: 'q-uuid',
+  session_id:      'sess-uuid',
+  question_id:     'q-uuid',
   selected_option: 'A' as const,
-  is_flagged: false,
+  is_flagged:      false,
 }
 
 describe('useAutoSave', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.restoreAllMocks()
-  })
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
   it('status awal adalah idle', () => {
     const { result } = renderHook(() => useAutoSave())
@@ -28,113 +22,89 @@ describe('useAutoSave', () => {
     expect(result.current.lastSavedAt).toBeNull()
   })
 
-  it('status berubah ke saving setelah saveAnswer dipanggil', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, saved_at: new Date().toISOString() }),
-    })
-
+  it('status berubah ke saving segera setelah saveAnswer dipanggil', () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
     const { result } = renderHook(() => useAutoSave({ debounceMs: 300 }))
-
     act(() => { result.current.saveAnswer(PAYLOAD) })
     expect(result.current.saveStatus).toBe('saving')
   })
 
-  it('debounce: hanya satu request yang dikirim untuk soal yang sama', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, saved_at: new Date().toISOString() }),
-    })
+  it('debounce: hanya satu fetch untuk soal yang sama', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
     global.fetch = fetchMock
 
     const { result } = renderHook(() => useAutoSave({ debounceMs: 300 }))
-
-    // Panggil 3x dengan cepat untuk soal yang sama
     act(() => {
       result.current.saveAnswer({ ...PAYLOAD, selected_option: 'A' })
       result.current.saveAnswer({ ...PAYLOAD, selected_option: 'B' })
       result.current.saveAnswer({ ...PAYLOAD, selected_option: 'C' })
     })
 
-    // Jalankan timer debounce
-    await act(async () => { vi.advanceTimersByTime(400) })
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
-
-    // Hanya satu panggilan dengan nilai terakhir ('C')
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    await act(async () => { await vi.runAllTimersAsync() })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     expect(body.selected_option).toBe('C')
   })
 
-  it('status berubah ke saved setelah fetch berhasil', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, saved_at: new Date().toISOString() }),
-    })
+  it('status saved setelah fetch berhasil (sebelum timer idle 2 detik)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
 
     const { result } = renderHook(() => useAutoSave({ debounceMs: 100 }))
-
     act(() => { result.current.saveAnswer(PAYLOAD) })
 
-    await act(async () => { vi.advanceTimersByTime(200) })
-    await waitFor(() => expect(result.current.saveStatus).toBe('saved'))
+    // Maju hanya cukup untuk debounce (100ms) + fetch resolve
+    // JANGAN maju 2000ms lebih karena hook punya setTimeout reset ke 'idle' setelah 2 detik
+    await act(async () => {
+      vi.advanceTimersByTime(150)   // lewati debounce 100ms
+      await Promise.resolve()       // flush microtask (fetch resolve)
+      await Promise.resolve()       // flush microtask kedua (setState dari fetch)
+    })
+
+    // Status harus 'saved' — timer reset-ke-idle belum jalan
+    expect(result.current.saveStatus).toBe('saved')
     expect(result.current.lastSavedAt).not.toBeNull()
   })
 
-  it('status berubah ke error saat fetch gagal permanen', async () => {
+  it('status error saat fetch gagal dan retry habis', async () => {
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({ error: 'Internal Server Error' }),
+      ok: false, status: 500, json: async () => ({ error: 'Server Error' }),
     })
 
     const { result } = renderHook(() =>
       useAutoSave({ debounceMs: 100, retryCount: 1 })
     )
-
     act(() => { result.current.saveAnswer(PAYLOAD) })
-
-    // Debounce + retry delays
-    await act(async () => { vi.advanceTimersByTime(5000) })
-    await waitFor(() => expect(result.current.saveStatus).toBe('error'), {
-      timeout: 3000,
-    })
+    await act(async () => { await vi.runAllTimersAsync() })
+    expect(result.current.saveStatus).toBe('error')
   })
 
-  it('status 410 (waktu habis) → error, tidak retry', async () => {
+  it('status 410 tidak retry — hanya 1 fetch', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 410,
-      json: async () => ({ error: 'Waktu ujian sudah habis' }),
+      ok: false, status: 410, json: async () => ({ error: 'Waktu habis' }),
     })
     global.fetch = fetchMock
 
     const { result } = renderHook(() =>
       useAutoSave({ debounceMs: 100, retryCount: 3 })
     )
-
     act(() => { result.current.saveAnswer(PAYLOAD) })
-    await act(async () => { vi.advanceTimersByTime(200) })
-    await waitFor(() => expect(result.current.saveStatus).toBe('error'))
+    await act(async () => { await vi.runAllTimersAsync() })
 
-    // Tidak ada retry — hanya 1 panggilan
+    expect(result.current.saveStatus).toBe('error')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('dua soal berbeda masing-masing dikirim sekali', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, saved_at: new Date().toISOString() }),
-    })
+  it('dua soal berbeda → dua fetch terpisah', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
     global.fetch = fetchMock
 
     const { result } = renderHook(() => useAutoSave({ debounceMs: 100 }))
-
     act(() => {
-      result.current.saveAnswer({ ...PAYLOAD, question_id: 'q-1' })
-      result.current.saveAnswer({ ...PAYLOAD, question_id: 'q-2' })
+      result.current.saveAnswer({ ...PAYLOAD, question_id: 'q-001' })
+      result.current.saveAnswer({ ...PAYLOAD, question_id: 'q-002' })
     })
 
-    await act(async () => { vi.advanceTimersByTime(200) })
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await act(async () => { await vi.runAllTimersAsync() })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

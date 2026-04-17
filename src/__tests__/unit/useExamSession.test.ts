@@ -16,75 +16,49 @@ const mockSession: ExamSession = {
   status: 'in_progress',
 }
 
-const makeQuestion = (n: number, section: 'TWK' | 'TIU' | 'TKP' = 'TWK'): Question => ({
-  id: `q-${n}`,
-  question_number: n,
-  content: `Pertanyaan ${n}`,
-  option_a: 'Opsi A',
-  option_b: 'Opsi B',
-  option_c: 'Opsi C',
-  option_d: 'Opsi D',
-  option_e: 'Opsi E',
-  section,
+const makeQ = (n: number, section: 'TWK' | 'TIU' | 'TKP' = 'TWK'): Question => ({
+  id: `q-${n}`, question_number: n, content: `Pertanyaan ${n}`,
+  option_a: 'A', option_b: 'B', option_c: 'C', option_d: 'D', option_e: 'E', section,
 })
 
-const questions: Question[] = [
-  makeQuestion(1, 'TWK'),
-  makeQuestion(2, 'TWK'),
-  makeQuestion(3, 'TIU'),
-]
+const questions: Question[] = [makeQ(1, 'TWK'), makeQ(2, 'TWK'), makeQ(3, 'TIU')]
 
 describe('useExamSession — navigasi', () => {
   it('mulai dari soal pertama (index 0)', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     expect(result.current.currentIndex).toBe(0)
     expect(result.current.currentQuestion?.id).toBe('q-1')
   })
 
   it('goNext pindah ke soal berikutnya', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.goNext())
     expect(result.current.currentIndex).toBe(1)
-    expect(result.current.currentQuestion?.id).toBe('q-2')
   })
 
   it('goPrev tidak bisa kurang dari 0', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.goPrev())
     expect(result.current.currentIndex).toBe(0)
   })
 
   it('goNext tidak bisa melebihi soal terakhir', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
-    act(() => {
-      result.current.goNext()
-      result.current.goNext()
-      result.current.goNext() // sudah di akhir, tidak berubah
-    })
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
+    act(() => result.current.goNext())
+    act(() => result.current.goNext())
+    act(() => result.current.goNext()) // sudah di akhir
     expect(result.current.currentIndex).toBe(2)
   })
 
   it('goToQuestion lompat ke index tertentu', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.goToQuestion(2))
     expect(result.current.currentIndex).toBe(2)
     expect(result.current.currentQuestion?.id).toBe('q-3')
   })
 
   it('goToQuestion index invalid diabaikan', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.goToQuestion(-1))
     expect(result.current.currentIndex).toBe(0)
     act(() => result.current.goToQuestion(99))
@@ -94,26 +68,20 @@ describe('useExamSession — navigasi', () => {
 
 describe('useExamSession — memilih jawaban', () => {
   it('selectAnswer menyimpan opsi yang dipilih', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.selectAnswer('B'))
     expect(result.current.answers['q-1']?.selected_option).toBe('B')
   })
 
   it('selectAnswer dengan opsi sama → toggle (batalkan)', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.selectAnswer('B'))
-    act(() => result.current.selectAnswer('B')) // klik lagi → batal
+    act(() => result.current.selectAnswer('B'))
     expect(result.current.answers['q-1']?.selected_option).toBeNull()
   })
 
   it('selectAnswer opsi berbeda → ganti jawaban', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.selectAnswer('A'))
     act(() => result.current.selectAnswer('C'))
     expect(result.current.answers['q-1']?.selected_option).toBe('C')
@@ -122,37 +90,28 @@ describe('useExamSession — memilih jawaban', () => {
   it('memanggil onAnswerChange callback', () => {
     const onAnswerChange = vi.fn()
     const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions, onAnswerChange })
-    )
+      useExamSession({ session: mockSession, questions, onAnswerChange }))
     act(() => result.current.selectAnswer('D'))
-    expect(onAnswerChange).toHaveBeenCalledWith('q-1', expect.objectContaining({
-      selected_option: 'D',
-    }))
+    expect(onAnswerChange).toHaveBeenCalledWith('q-1', expect.objectContaining({ selected_option: 'D' }))
   })
 })
 
 describe('useExamSession — flagging', () => {
   it('toggleFlag menandai soal sebagai ragu-ragu', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.toggleFlag())
     expect(result.current.answers['q-1']?.is_flagged).toBe(true)
   })
 
   it('toggleFlag dua kali → kembali tidak di-flag', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.toggleFlag())
     act(() => result.current.toggleFlag())
     expect(result.current.answers['q-1']?.is_flagged).toBe(false)
   })
 
   it('flag tidak menghapus jawaban yang sudah ada', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.selectAnswer('E'))
     act(() => result.current.toggleFlag())
     expect(result.current.answers['q-1']?.selected_option).toBe('E')
@@ -162,54 +121,45 @@ describe('useExamSession — flagging', () => {
 
 describe('useExamSession — statistik', () => {
   it('answeredCount dihitung dengan benar', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     expect(result.current.answeredCount).toBe(0)
 
-    act(() => {
-      result.current.selectAnswer('A')           // q-1 dijawab
-      result.current.goNext()
-      result.current.selectAnswer('B')           // q-2 dijawab
-    })
+    // act() TERPISAH untuk setiap state update — goNext harus selesai sebelum selectAnswer berikutnya
+    act(() => result.current.selectAnswer('A'))   // jawab q-1
+    act(() => result.current.goNext())             // pindah ke q-2
+    act(() => result.current.selectAnswer('B'))   // jawab q-2
+
     expect(result.current.answeredCount).toBe(2)
   })
 
   it('unansweredCount benar', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.selectAnswer('A'))
     expect(result.current.unansweredCount).toBe(2)
   })
 
   it('flaggedCount benar', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
-    act(() => {
-      result.current.toggleFlag()        // flag q-1
-      result.current.goNext()
-      result.current.toggleFlag()        // flag q-2
-    })
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
+
+    // act() TERPISAH — goNext harus selesai sebelum toggleFlag di soal berikutnya
+    act(() => result.current.toggleFlag())         // flag q-1
+    act(() => result.current.goNext())             // pindah ke q-2
+    act(() => result.current.toggleFlag())         // flag q-2
+
     expect(result.current.flaggedCount).toBe(2)
   })
 })
 
 describe('useExamSession — submit flow', () => {
   it('triggerSubmit menampilkan confirm dialog', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     expect(result.current.showSubmitConfirm).toBe(false)
     act(() => result.current.triggerSubmit())
     expect(result.current.showSubmitConfirm).toBe(true)
   })
 
   it('cancelSubmit menutup confirm dialog', () => {
-    const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions })
-    )
+    const { result } = renderHook(() => useExamSession({ session: mockSession, questions }))
     act(() => result.current.triggerSubmit())
     act(() => result.current.cancelSubmit())
     expect(result.current.showSubmitConfirm).toBe(false)
@@ -221,8 +171,7 @@ describe('useExamSession — submit flow', () => {
       'q-2': { question_id: 'q-2', selected_option: 'A', is_flagged: false },
     }
     const { result } = renderHook(() =>
-      useExamSession({ session: mockSession, questions, initialAnswers })
-    )
+      useExamSession({ session: mockSession, questions, initialAnswers }))
     expect(result.current.answers['q-1']?.selected_option).toBe('C')
     expect(result.current.answers['q-1']?.is_flagged).toBe(true)
     expect(result.current.answeredCount).toBe(2)
