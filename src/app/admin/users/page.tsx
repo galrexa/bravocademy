@@ -1,9 +1,9 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServer } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import { AdminUsersTable } from './AdminUsersTable'
 
 export default async function AdminUsersPage() {
-  const supabase = await createServerSupabaseClient()
+  const supabase = await createServer()
 
   // Cek apakah user adalah super_admin
   const { data: { user } } = await supabase.auth.getUser()

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
 
 type User = {
   id: string
@@ -28,7 +27,6 @@ export function AdminUsersTable({
   users: User[]
   currentUserId: string
 }) {
-  const supabase = createClient()
   const [users, setUsers] = useState(initialUsers)
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState<string>('all')
@@ -45,11 +43,12 @@ export function AdminUsersTable({
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (userId === currentUserId) return
     setUpdatingId(userId)
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-    if (!error) {
+    const res = await fetch('/api/admin/role', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, newRole }),
+    })
+    if (res.ok) {
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
       )

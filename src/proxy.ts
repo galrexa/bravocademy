@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-type Role = 'user' | 'mentor' | 'admin' | 'super_admin'
+type Role = 'student' | 'mentor' | 'admin' | 'super_admin'
 
 /**
  * RBAC Configuration
@@ -11,9 +11,9 @@ const ROUTE_ROLES: Record<string, Role[]> = {
   '/admin/users':     ['super_admin'],
   '/admin/questions': ['mentor', 'admin', 'super_admin'],
   '/admin':           ['admin', 'super_admin'],
-  '/exam':            ['user', 'super_admin'],
-  '/modules':         ['user', 'mentor', 'admin', 'super_admin'],
-  '/dashboard':       ['user', 'mentor', 'admin', 'super_admin'],
+  '/exam':            ['student', 'super_admin'],
+  '/modules':         ['student', 'mentor', 'admin', 'super_admin'],
+  '/dashboard':       ['student', 'mentor', 'admin', 'super_admin'],
 }
 
 /**
@@ -87,7 +87,7 @@ export async function proxy(req: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  const userRole = (profile?.role ?? 'user') as Role
+  const userRole = (profile?.role ?? 'student') as Role
 
   // 7. Proteksi: Role tidak mencukupi (403 Forbidden)
   if (!allowedRoles.includes(userRole)) {

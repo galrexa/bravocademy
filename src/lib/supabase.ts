@@ -1,7 +1,7 @@
 import { createBrowserClient, createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-// ─── BROWSER CLIENT (Aman untuk Client Components) ──────────────────────────
-// Gunakan ini di file dengan direktif 'use client'
+// ─── Browser client (digunakan di Client Components) ──────────────────────────
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,31 +9,32 @@ export function createClient() {
   )
 }
 
-// ─── SERVER CLIENT (Khusus Server Components / Server Actions / Route Handlers) ──
-// Kita gunakan teknik 'lazy loading' untuk cookies agar tidak crash di client
+// ─── Server client (digunakan di Server Components & Route Handlers) ──────────
+// cookies() dipanggil secara lazy di dalam adapter agar tidak crash karena
+// Next.js 16 mengembalikan decorated Promise dari cookies() di dev mode.
 export function createServer() {
-  // Hanya import next/headers SAAT fungsi ini dipanggil di server
-  const { cookies } = require('next/headers')
-  const cookieStore = cookies()
-
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
+        async getAll() {
+          return (await cookies()).getAll()
         },
-        setAll(cookiesToSet) {
+        async setAll(cookiesToSet) {
           try {
+            const store = await cookies()
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              store.set(name, value, options)
             )
           } catch {
-            // Abaikan error jika dipanggil di Server Component yang bersifat read-only
+            // setAll dipanggil dari Server Component → abaikan
           }
         },
       },
     }
   )
 }
+
+// Alias untuk backward compatibility
+export const createServerSupabaseClient = createServer
